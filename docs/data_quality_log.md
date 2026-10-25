@@ -3,7 +3,7 @@
 **Project:** Can the Baby GOAT Surpass the GOAT?  
 **Dataset:** Brady vs. Mahomes — First 131 Regular-Season Starts  
 **Document status:** Active  
-**Last updated:** October 23, 2026
+**Last updated:** October 25, 2026
 
 ## Purpose
 
@@ -24,7 +24,9 @@ Raw datasets must remain unchanged. Corrections belong in documented processing 
 | QC-007 | No null values in required master-table fields | Zero null values | Passed |
 | QC-008 | Play-by-play `game_id` references for the 2018 regular season | Zero unmatched PBP records | Passed (45,120 PBP records; 256 games) |
 | QC-009 | Historical coverage of all metrics used in comparisons | Coverage documented by player and season | Pending — later analysis |
-| QC-010 | Passing totals cross-checked against independent box scores | Agreement or documented differences | Pending — later analysis |
+| QC-010 | Passing totals spot-checked against reported NFL records | Brady 2005 Week 17 and Mahomes 2018 season totals | Passed in local script (limited coverage) |
+| QC-011 | All 262 player-game passing records cross-checked against weekly player stats | Exact agreement on five integer metrics, or investigated differences | Passed — user-reported local run; zero unexplained discrepancies |
+| QC-012 | NFL/PFR box-score sample across all 20 player-seasons | Exact match, evidence URLs recorded | Partially completed — user-reported sampled external checks passed; sample size and URLs not supplied |
 
 **Scope note:** “Passed” reflects the user's local pipeline output and reported checks, not an independent rerun of their files. Further validation is required before making substantive performance claims.
 
@@ -124,11 +126,56 @@ This confirms key coverage for the tested 2018 subset. It does **not** by itself
 
 ---
 
+---
+
+## DQ-003 — Missing Spike in Passing Attempt Count (2018 Mahomes)
+
+| Field | Value |
+|---|---|
+| **Status** | Resolved in extraction logic; cross-pipeline audit passed (user-reported) |
+| **Severity** | Medium — metric definition |
+| **Affected metric** | `attempts`, and derived completion/TD/INT rates and yards/attempt |
+| **Affected test** | Mahomes, 2018 regular season |
+| **Detection** | Independent historical total expected 580 attempts; first PBP aggregation produced 579 |
+
+### Detection
+
+The original `create_player_stats.py` omitted clock-stopping quarterback spike plays, yielding 579 attempts instead of 580. Completions (383), passing yards (5,097), touchdowns (50), and interceptions (12) matched the official 2018 Mahomes season totals.
+
+### Resolution
+
+The passing-attempt selection logic includes `play_type == 'qb_spike'` and `qb_spike == 1` as incomplete official pass attempts. Sacks, scrambles, and two-point tries remain excluded from official passing attempts. Original PBP files are unchanged.
+
+### Local Verification
+
+The user reported that the corrected script passed both existing historical reference checks and exported its derived tables. The exact spike `game_id`/`play_id` still needs to be recorded. The user subsequently reported that the full 262-game cross-pipeline audit passed; this is a shared-ecosystem consistency check, not independent verification of all 262 games.
+
+### Follow-up
+
+- [ ] Record the affected spike's `game_id` and `play_id`.
+- [x] Run the 262-game comparison with nflverse weekly player statistics (user-reported pass).
+- [ ] Complete and record the season-stratified NFL/PFR box-score sample; some manual checks were reported as passing, but their count and URLs are not yet recorded.
+
+---
+
+## DQ-004 — Comprehensive Game-Level Passing Statistics Audit
+
+| Field | Value |
+|---|---|
+| **Status** | Cross-pipeline audit passed (user-reported); external sample partially verified |
+| **Severity** | High for conclusions based on passing statistics |
+| **Scope** | 262 starts × 5 integer metrics = 1,310 comparisons |
+
+**Execution update (user-reported, October 25, 2026):** `scripts/validate_passing_stats.py` completed with 100% agreement, and a subset of games was manually checked without discrepancies. The number and identities of manual checks, their direct source URLs, the exact audit summary, and checksums have not been provided here. No independent rerun of the user’s local files was performed. The weekly stats share source provenance with PBP, so agreement is a cross-pipeline consistency check rather than independent confirmation of every NFL box score.
+
+**Evidence:** See `docs/passing_statistics_validation.md`. Results and URLs must be added after the checks actually run.
+
 ## Open Validation Work
 
 - [ ] Run the PBP-to-schedules anti-join across **all** study seasons.
 - [ ] Measure missingness and field availability for each passing-efficiency metric by season and quarterback.
-- [ ] Cross-check official passing attempts, yards, TDs, and INTs against an independent box-score source.
+- [x] Compare all 262 starts across five passing metrics to weekly nflverse player stats (user-reported full pass).
+- [ ] Record full season-stratified NFL/PFR box-score coverage and direct links; several manual checks reportedly passed.
 - [ ] Verify that `qb_dropback` correctly captures sacks and scrambles and that QB attribution is consistent.
 - [ ] Document source versions, extraction timestamps, and reproducible checksums for analysis snapshots.
 - [ ] Save exact game-level evidence links for DQ-001.

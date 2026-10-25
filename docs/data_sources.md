@@ -1,7 +1,7 @@
 # Data Sources and Provenance
 
 **Project:** Can the Baby GOAT Surpass the GOAT?  
-**Status:** Data collection and validation  
+**Status:** 262-game cross-pipeline validation passed (user-reported); independent external box-score sample partially checked  
 **Research snapshot cutoff:** October 18, 2026
 
 ## 1. Purpose
@@ -43,6 +43,21 @@ This document identifies the original sources, collection methods, coverage, sto
 **Filtering rule:** Regular-season events only, restricted to the games in the validated 131-start master table. Attribute individual events to their actual quarterback; do not automatically assign a starter every snap played by his team.
 
 **Historical comparability:** Some advanced fields have limited historical coverage, and nflfastR definitions may differ from official box-score statistics. Each analytical metric requires a defined denominator and a coverage audit.
+
+
+### 2.3 nflverse Weekly Player Statistics — Validation Reference
+
+- **Provider:** nflverse, player statistics release (shares NFL play-stat provenance with the PBP dataset).
+- **Python access:** `nflreadpy.load_player_stats(seasons=[season], summary_level="week")`.
+- **Documentation:** https://nflreadr.nflverse.com/articles/dictionary_player_stats.html
+- **Local cache:** `data/raw/player_stats/stats_player_week_{season}.parquet`.
+- **Grain:** Player × NFL game (weekly summary).
+- **Join keys:** `player_id`, `game_id`.
+- **Metrics used for QA:** `attempts`, `completions`, `passing_yards`, `passing_tds`, `passing_interceptions`.
+- **Purpose:** Full cross-pipeline consistency check for 262 player-game records.
+- **Independence warning:** This is **not** an external source of truth. Both player weekly statistics and PBP are maintained within the nflverse ecosystem and can share underlying errors.
+
+To supplement this automated check, sample external game box scores from NFL.com or Pro Football Reference and record exact URLs and counts. See `docs/passing_statistics_validation.md`.
 
 ## 3. Independent Validation Sources
 
@@ -104,7 +119,7 @@ Complete the following **from the local environment**; these values should not b
 | PBP files and per-season row counts | TODO |
 | SHA-256 checksums of frozen source files | TODO |
 | Missing or incomplete downloads | TODO |
-| Known source-data exceptions | `DQ-001` |
+| Known source-data exceptions | `DQ-001`, `DQ-003` |
 | Research cutoff | `2026-10-18` |
 
 The research cutoff refers to **games included in the analysis**, not the actual download timestamp. Because the nflverse dataset may be revised, record an extraction timestamp and file hashes for an exact reproducibility snapshot.
@@ -121,13 +136,23 @@ The research cutoff refers to **games included in the analysis**, not the actual
 - [ ] Individual QB statistics exclude replacement-quarterback plays.
 - [ ] All published metrics identify numerator, denominator, data coverage, and limitations.
 
-## 8. Licensing, Attribution, and Publication
+## 8. Passing Statistics Validation Evidence (October 25, 2026)
+
+- **Computed output:** `data/processed/qb_game_stats.parquet`, derived by `scripts/create_player_stats.py` from historical PBP and the validated 131-start master table.
+- **Comparison reference:** nflverse weekly player statistics, obtained by `scripts/validate_passing_stats.py`.
+- **Scope:** 262 player-game rows × 5 integer metrics (attempts, completions, passing yards, passing TDs, interceptions) = 1,310 comparison cells if every row and metric is present.
+- **Reported result:** User confirms the automated validation passed with 100% agreement and that several manually examined external game records also matched.
+- **Limitations:** This result is based on the user's local execution, not an independent rerun in this documentation environment. Weekly NFL player statistics and play-by-play may have shared nflverse provenance. The number, selection, and URLs of manually verified games were not supplied; full independent verification is **not** claimed.
+- **Evidence to retain:** `reports/validation/passing_validation_summary.md`, `passing_game_comparison.csv`, `passing_discrepancies.csv`, and completed `official_boxscore_review_template.csv` with direct NFL/PFR links.
+- **Provenance TODO:** Record extraction timestamps, nflreadpy/polars versions, file checksums, and an exact audit run date from the local environment.
+
+## 9. Licensing, Attribution, and Publication
 
 Cite nflverse, nflfastR, and the applicable original data sources when publishing results. Check the license and redistribution rules for every dataset before sharing it; the main nflverse datasets are generally distributed under Creative Commons attribution terms, but individual data products may differ.
 
 The repository should normally **version scripts, research documentation, and figures**, not large raw or processed datasets. A `.gitignore` can exclude `data/raw/` and `data/processed/`; maintain a reproducible acquisition pipeline instead.
 
-## 9. References
+## 10. References
 
 - [nflreadpy Documentation](https://nflreadpy.nflverse.com/)
 - [nflreadr Schedule Data Dictionary](https://nflreadr.nflverse.com/articles/dictionary_schedules.html)

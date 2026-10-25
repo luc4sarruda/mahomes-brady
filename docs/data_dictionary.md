@@ -121,3 +121,44 @@ Do not compute CPOE for a complete cross-era core comparison without first demon
 - [Research Protocol](../research_protocol.md)
 
 **Maintenance note:** Types above are typical expected types; check `DataFrame.schema` for the exact types and field availability in each downloaded version. Update this dictionary if the pipeline's selected fields change.
+
+
+---
+
+## Game-Level Passing Statistics (Added October 25, 2026)
+
+**Dataset:** `data/processed/qb_game_stats.parquet`  
+**Grain:** One quarterback × game started (262 rows expected).  
+**Join:** `(player_id, game_id)` to `qb_first_131_starts.parquet`.
+
+| Field | Definition |
+|---|---|
+| `attempts` | Official-style passing attempts; includes quarterback clock-stopping spikes, excludes sacks and scrambles |
+| `completions` | Completed credited pass attempts |
+| `passing_yards` | Passing yards credited to the actual passer |
+| `passing_tds` | Passing touchdowns thrown |
+| `interceptions` | Interceptions thrown |
+| `completion_pct` | 100 × completions / attempts |
+| `yards_per_attempt` | passing_yards / attempts |
+| `td_rate` | 100 × passing_tds / attempts |
+| `int_rate` | 100 × interceptions / attempts |
+
+Rates are undefined (`null`) for games with zero pass attempts. QB substitutions are handled by play-level player IDs; the starting QB does not inherit the replacement QB's production. To understand exact filters, data-quality checks, and the distinction between a source-consistency check and independent box-score verification, see [`passing_statistics_validation.md`](passing_statistics_validation.md).
+
+**External reference fields (nflverse weekly player stats):** `attempts`, `completions`, `passing_yards`, `passing_tds`, `passing_interceptions`. Source dictionary: https://nflreadr.nflverse.com/articles/dictionary_player_stats.html.
+
+
+## Passing Statistics — Validation Status (October 25, 2026)
+
+The user reported that `scripts/create_player_stats.py` and `scripts/validate_passing_stats.py` completed successfully, with all 262 quarterback-start records matching the weekly nflverse reference on the five integer passing statistics. Selected game box scores were also manually reviewed with no reported discrepancies; the specific external sample and URLs are not yet recorded. This is **not** proof that all 262 box scores were independently checked.
+
+**Derived datasets and grain:**
+
+| Dataset | Grain | Validation / purpose |
+|---|---|---|
+| `qb_first_131_starts.parquet` | One QB start | Defines 262 eligible games |
+| `qb_pass_attempts.parquet` | One credited pass attempt | Auditable selection, including QB spikes |
+| `qb_game_stats.parquet` | One QB start | Passing metrics, including zero-attempt starts if applicable |
+| `qb_master_stats.parquet` | One QB start | Game context joined to passing stats |
+
+**Rules:** Aggregate `completions`, `attempts`, `passing_yards`, `passing_tds`, and `interceptions` before calculating overall rates; never average game-level percentages without weighting. The QB's start does not imply ownership of a replacement's passing attempts. A spike counts as an incomplete official pass attempt. Keep `qb_dropback`/EPA separate from official passing attempts. See [Passing Statistics Validation](passing_statistics_validation.md) and [Data Quality Log](data_quality_log.md).
