@@ -1,7 +1,7 @@
 # Rushing, Mobility, and Sacks — Methodology
 
 **Project:** Can the Baby GOAT Surpass the GOAT?  
-**Status:** Implementation available; **not yet validated against the user's local datasets**.  
+**Status:** PBP aggregation and 262-game weekly-stat audit passed in the user's local run (reported October 25, 2026). Independent manual checks were conducted for some games; the full external sample is not yet documented.  
 **Scope:** First 131 regular-season starts of Tom Brady and Patrick Mahomes (262 player-game records).
 
 ## 1. Purpose
@@ -31,8 +31,10 @@ Build a per-start rushing and mobility table, independently from the validated p
 | `rushing_tds` | Sum of credited rushing touchdowns | Do not include passing touchdowns |
 | `scrambles` | QB rushes flagged `qb_scramble == 1`, excluding kneels | Source classification is not a full tactical annotation |
 | `scramble_yards` | Yards on flagged scrambles | Part of total rushing yards |
-| `designed_runs` | Credited QB rushes that are neither a scramble nor a kneel | **Proxy:** includes runs not flagged as scrambles, not a verified play-call classification |
+| `designed_runs` | Credited QB rushes that are neither a scramble, an aborted-snap rush, nor a kneel | **Proxy:** not a verified play-call classification |
 | `designed_run_yards` | Yards on the above proxy | Subject to classification errors |
+| `aborted_rushes` | Credited QB rushing attempts identified as aborted-snap plays | Excluded from designed-run proxy |
+| `aborted_rush_yards` | Credited rushing yards on aborted-snap plays | A guarded, auditable one-play 2023 correction is documented separately |
 | `kneels` | Credited QB rushes marked as kneel by field, play type, or description | Historical indicators may be inconsistent |
 | `kneel_yards` | Yards on kneels | Usually negative |
 | `non_kneel_carries` | `carries - kneels` | Better for QB running-usage comparisons |
@@ -60,8 +62,9 @@ Build a per-start rushing and mobility table, independently from the validated p
 **Level A — Internal structural checks**
 
 - Exactly 262 distinct player-game records; same IDs as the master table.
-- Partition check: `carries = scrambles + designed_runs + kneels`.
-- Yardage partition check: rushing yards equals sum of those three categories.
+- Partition check: `carries = scrambles + designed_runs + aborted_rushes + kneels`.
+- Yardage partition check: `rushing_yards = scramble_yards + designed_run_yards + aborted_rush_yards + kneel_yards`.
+- Non-kneel attempts and yards must equal total rushing attempts and yards minus kneels.
 - No duplicate `(game_id, play_id)` in the selected PBP records.
 - No suspicious unattributed kneels or sacks on the studied teams without review.
 - Impossible counts or missing required yardage block completion.
@@ -81,8 +84,10 @@ Build a per-start rushing and mobility table, independently from the validated p
 ## 6. Known Constraints and Research Notes
 
 - Historical PBP may classify kneels inconsistently, so the script includes a conservative textual fallback; audit any mismatch found in weekly totals.
-- An unflagged scramble may appear among `designed_runs`. Interpret this field as **non-scramble, non-kneel rushes**, not a ground-truth classification of the play called in the huddle.
-- Some official rushing events following laterals or atypical plays can have different attribution from a simple PBP sum. Investigate differences, do not automatically overwrite them.
+- An unflagged scramble may appear among `designed_runs`. Interpret this field as **non-scramble, non-aborted, non-kneel rushes**, not a ground-truth classification of the play called in the huddle.
+- The audited 2020 Chiefs–Saints lateral play requires `td_player_id == player_id` to credit a rushing touchdown to its actual scorer. A play-level `rush_touchdown` flag alone is insufficient.
+- The audited 2023 Chiefs–Jaguars aborted snap requires a guarded correction of one QB rushing yard, preserving the raw value and correction reason. See `docs/rushing_discrepancy_report.md` if that report is tracked in this repository.
+- The 262-game automated audit passed according to the user's local execution; it remains a same-ecosystem cross-check, not an independent review of every game.
 - A starting quarterback can be replaced mid-game. Include the **start** in the study, but never assign the backup's carries or sacks to the starter.
 - Fumbles and EPA are **out of scope for this extraction**; they will have their own documented definitions and validation.
 
@@ -95,7 +100,7 @@ python3 scripts/create_rushing_stats.py
 python3 scripts/validate_rushing_stats.py
 ```
 
-**Do not merge `qb_rushing_stats.parquet` into the main analytical table until both the internal checks and the cross-pipeline audit pass and any differences are explained.**
+**The user reports that the internal and cross-pipeline checks passed after the documented corrections.** The analysis integration must preserve four rushing categories, including aborted snaps; otherwise an outdated three-category partition check will fail.
 
 ## 8. References
 
